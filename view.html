@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>社内予定表</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 16px; }
+    h1 { font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+    .week-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; margin-top: 8px; }
+    .week-nav button { padding: 6px 12px; font-size: 14px; border-radius: 8px; border: 1px solid #ddd; background: white; cursor: pointer; }
+    .week-label { font-size: 13px; color: #888; flex: 1; text-align: center; }
+    .dept-section { margin-bottom: 20px; }
+    .dept-title { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; padding-left: 4px; border-left: 3px solid #06C755; padding-left: 8px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 420px; }
+    th { background: #f0f0f0; padding: 6px 4px; border: 1px solid #ddd; text-align: center; font-weight: 500; white-space: nowrap; }
+    th.name-col { text-align: left; padding-left: 8px; width: 80px; }
+    td { border: 1px solid #ddd; padding: 2px; text-align: center; vertical-align: middle; }
+    td.name-cell { text-align: left; padding: 6px 8px; font-weight: 500; background: #fafafa; white-space: nowrap; }
+    .half-wrap { display: flex; flex-direction: column; gap: 1px; }
+    .half { padding: 3px 2px; font-size: 13px; font-weight: bold; border-radius: 4px; display: flex; align-items: center; justify-content: center; gap: 2px; }
+    .half-label { font-size: 9px; color: #aaa; }
+    .maru { color: #1D9E75; background: #E1F5EE; }
+    .sankaku { color: #BA7517; background: #FAEEDA; }
+    .batu { color: #A32D2D; background: #FCEBEB; }
+    .none { color: #ccc; background: transparent; }
+    .today-col { background: #E8F5E9 !important; }
+    .legend { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #888; }
+    .legend-sym { font-size: 14px; font-weight: bold; }
+    .loading { text-align: center; color: #888; padding: 40px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>社内予定表</h1>
+  <div class="week-nav">
+    <button onclick="changeWeek(-1)">← 前の週</button>
+    <span class="week-label" id="week-label"></span>
+    <button onclick="changeWeek(1)">次の週 →</button>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-sym" style="color:#1D9E75;">○</span>出勤・連絡可</div>
+    <div class="legend-item"><span class="legend-sym" style="color:#BA7517;">△</span>休み・連絡可</div>
+    <div class="legend-item"><span class="legend-sym" style="color:#A32D2D;">×</span>不在・連絡不可</div>
+  </div>
+  <div id="content"><div class="loading">読み込み中...</div></div>
+
+  <script>
+    const GAS_URL = 'YOUR_GAS_URL';
+    const DAY_JA = ['日','月','火','水','木','金','土'];
+    let weekOffset = 0;
+    let allMembers = [];
+    let allSchedule = [];
+
+    function getMondayOf(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function getWeekDates() {
+      const mon = getMondayOf(new Date());
+      mon.setDate(mon.getDate() + weekOffset * 7);
+      return Array.from({length: 7}, (_, i) => {
+        const d = new Date(mon);
+        d.setDate(d.getDate() + i);
+        return d;
+      });
+    }
+
+    function dateKey(d) {
+      return d.toISOString().slice(0, 10);
+    }
+
+    function isToday(d) {
+      return dateKey(d) === dateKey(new Date());
+    }
+
+    function getStatus(lineId, date, slot) {
+      const dk = dateKey(date);
+      const row = allSchedule.find(s => s.line_id === lineId && s.date === dk);
+      if (!row) return '';
+      return slot === 'am' ? row.am : row.pm;
+    }
+
+    function statusCell(st) {
+      if (st === 'maru') return `<div class="half maru">○</div>`;
+      if (st === 'sankaku') return `<div class="half sankaku">△</div>`;
+      if (st === 'batu') return `<div class="half batu">×</div>`;
+      return `<div class="half none">—</div>`;
+    }
+
+    function render() {
+      const dates = getWeekDates();
+      const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+      document.getElementById('week-label').textContent =
+        `${fmt(dates[0])}（月）〜 ${fmt(dates[6])}（日）`;
+
+      const depts = ['事務', '現場監督'];
+      let html = '';
+
+      depts.forEach(dept => {
+        const members = allMembers.filter(m => m.dept === dept);
+        if (!members.length) return;
+
+        html += `<div class="dept-section"><div class="dept-title">${dept}</div><div class="table-wrap"><table>`;
+        html += '<tr><th class="name-col">氏名</th>';
+        dates.forEach(d => {
+          html += `<th class="${isToday(d) ? 'today-col' : ''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:10px;">${DAY_JA[d.getDay()]}</span></th>`;
+        });
+        html += '</tr>';
+
+        members.forEach(m => {
+          html += `<tr><td class="name-cell">${m.name}</td>`;
+          dates.forEach(d => {
+            const am = getStatus(m.line_id, d, 'am');
+            const pm = getStatus(m.line_id, d, 'pm');
+            html += `<td class="${isToday(d) ? 'today-col' : ''}"><div class="half-wrap">`;
+            html += `<div style="display:flex;align-items:center;gap:2px;">${statusCell(am)}<span class="half-label">午前</span></div>`;
+            html += `<div style="display:flex;align-items:center;gap:2px;">${statusCell(pm)}<span class="half-label">午後</span></div>`;
+            html += `</div></td>`;
+          });
+          html += '</tr>';
+        });
+
+        html += '</table></div></div>';
+      });
+
+      document.getElementById('content').innerHTML = html || '<div class="loading">データがありません</div>';
+    }
+
+    async function loadData() {
+      document.getElementById('content').innerHTML = '<div class="loading">読み込み中...</div>';
+      try {
+        const [membersRes, scheduleRes] = await Promise.all([
+          fetch(`${GAS_URL}?action=getMembers`),
+          fetch(`${GAS_URL}?action=getSchedule`)
+        ]);
+        allMembers = await membersRes.json();
+        allSchedule = await scheduleRes.json();
+
+        // scheduleのdateを文字列に統一
+        allSchedule = allSchedule.map(s => ({
+          ...s,
+          date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0, 10)
+        }));
+
+        render();
+      } catch(e) {
+        document.getElementById('content').innerHTML = '<div class="loading">読み込みエラー: ' + e.message + '</div>';
+      }
+    }
+
+    function changeWeek(dir) {
+      weekOffset += dir;
+      render();
+    }
+
+    loadData();
+  </script>
+</body>
+</html>
