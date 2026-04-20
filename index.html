@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>予定入力</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+    .date { font-size: 13px; color: #888; margin-bottom: 20px; }
+    .section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .section-title { font-size: 13px; color: #888; margin-bottom: 10px; }
+    .btns { display: flex; gap: 10px; }
+    .btn { flex: 1; padding: 16px 0; border-radius: 10px; border: 2px solid #ddd;
+      font-size: 22px; font-weight: bold; background: white; cursor: pointer; }
+    .btn.selected-maru { border-color: #1D9E75; background: #E1F5EE; color: #1D9E75; }
+    .btn.selected-sankaku { border-color: #BA7517; background: #FAEEDA; color: #BA7517; }
+    .btn.selected-batu { border-color: #A32D2D; background: #FCEBEB; color: #A32D2D; }
+    .submit { width: 100%; padding: 16px; background: #06C755; color: white;
+      border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
+    .name-box { font-size: 15px; font-weight: bold; margin-bottom: 4px; }
+    .msg { text-align: center; font-size: 14px; color: #888; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div id="app">読み込み中...</div>
+
+  <script>
+    const LIFF_ID = '2009834318-zb00ZUeL';
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycby3gEvGXYTwEWbz5YRlb3fy77r3_FQ2jhXJxbHpp4X96asvTKWZ_lWoy_6MqHktS9U/exec';
+
+    let lineId = '';
+    let selected = { am: '', pm: '' };
+
+    async function init() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+      } catch(e) {
+        document.getElementById('app').innerHTML = 'LIFF初期化エラー: ' + e.message;
+        return;
+      }
+
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+
+      let profile;
+      try {
+        profile = await liff.getProfile();
+      } catch(e) {
+        document.getElementById('app').innerHTML = 'プロフィール取得エラー: ' + e.message;
+        return;
+      }
+      lineId = profile.userId;
+
+      let member;
+      try {
+        const res = await fetch(`${GAS_URL}?action=getMember&line_id=${lineId}`);
+        member = await res.json();
+      } catch(e) {
+        document.getElementById('app').innerHTML = 'API接続エラー: ' + e.message;
+        return;
+      }
+
+      if (!member.name) {
+        document.getElementById('app').innerHTML = `
+          <div class="section">
+            <div class="section-title">初回登録</div>
+            <input id="reg-name" type="text" placeholder="氏名を入力" style="width:100%;padding:10px;font-size:15px;border-radius:8px;border:1px solid #ddd;margin-bottom:10px;box-sizing:border-box;">
+            <select id="reg-dept" style="width:100%;padding:10px;font-size:15px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
+              <option value="事務">事務</option>
+              <option value="現場監督">現場監督</option>
+            </select>
+            <button class="submit" style="margin-top:16px;" onclick="register()">登録する</button>
+            <p class="msg" id="reg-msg"></p>
+          </div>
+        `;
+        return;
+      }
+
+      showSchedule(member);
+    }
+
+    function showSchedule(member) {
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0, 10);
+      const dateLabel = `${today.getMonth()+1}月${today.getDate()}日（${'日月火水木金土'[today.getDay()]}）`;
+
+      document.getElementById('app').innerHTML = `
+        <div class="name-box">${member.name}　<span style="font-size:12px;color:#888;">${member.dept}</span></div>
+        <div class="date">${dateLabel}の予定</div>
+        <div class="section">
+          <div class="section-title">午前</div>
+          <div class="btns">
+            <button class="btn" onclick="select('am','maru',this)">○</button>
+            <button class="btn" onclick="select('am','sankaku',this)">△</button>
+            <button class="btn" onclick="select('am','batu',this)">×</button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">午後</div>
+          <div class="btns">
+            <button class="btn" onclick="select('pm','maru',this)">○</button>
+            <button class="btn" onclick="select('pm','sankaku',this)">△</button>
+            <button class="btn" onclick="select('pm','batu',this)">×</button>
+          </div>
+        </div>
+        <button class="submit" onclick="submitSchedule('${dateStr}')">送信する</button>
+        <p class="msg" id="result"></p>
+      `;
+    }
+
+    function select(slot, val, el) {
+      selected[slot] = val;
+      el.parentElement.querySelectorAll('.btn').forEach(b => b.className = 'btn');
+      el.classList.add(`selected-${val}`);
+    }
+
+    async function register() {
+      const name = document.getElementById('reg-name').value.trim();
+      const dept = document.getElementById('reg-dept').value;
+      if (!name) {
+        document.getElementById('reg-msg').textContent = '氏名を入力してください';
+        return;
+      }
+      document.getElementById('reg-msg').textContent = '登録中...';
+      await fetch(`${GAS_URL}?action=registerMember&line_id=${lineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
+      location.reload();
+    }
+
+    async function submitSchedule(date) {
+      if (!selected.am || !selected.pm) {
+        document.getElementById('result').textContent = '午前・午後どちらも選んでください';
+        return;
+      }
+      await fetch(`${GAS_URL}?action=setSchedule&line_id=${lineId}&date=${date}&am=${selected.am}&pm=${selected.pm}`);
+      document.getElementById('result').textContent = '✓ 送信しました！';
+    }
+
+    init();
+  </script>
+</body>
+</html>
