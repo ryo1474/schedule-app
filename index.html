@@ -268,10 +268,15 @@
     const dept = document.getElementById('reg-dept').value;
     if (!name) { document.getElementById('reg-msg').textContent = '氏名を入力してください'; return; }
     document.getElementById('reg-msg').textContent = '登録中...';
-    await jsonp(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
-    allMembers.push({ line_id: myLineId, name, dept });
-    myMember = { name, dept };
-    render();
+    try {
+      await jsonp(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
+      document.getElementById('reg-msg').textContent = '登録完了！読み込み中...';
+      await loadData();
+      myMember = allMembers.find(m => m.line_id === myLineId) || null;
+      render();
+    } catch(e) {
+      document.getElementById('reg-msg').textContent = 'エラー: ' + e.message;
+    }
   }
 
   async function init() {
