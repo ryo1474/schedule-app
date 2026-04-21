@@ -288,13 +288,18 @@
 
   async function init() {
     try {
-      await liff.init({ liffId: LIFF_ID });
+      await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
     } catch(e) {
       document.getElementById('app').innerHTML = '<div class="loading">LIFF初期化エラー: ' + e.message + '</div>';
       return;
     }
 
-    if (!liff.isLoggedIn()) { liff.login(); return; }
+    if (!liff.isLoggedIn()) { 
+      liff.login({ 
+      redirectUri: 'https://ryo1474.github.io/schedule-app/' 
+      }); 
+    return; 
+    }
 
     const profile = await liff.getProfile();
     myLineId = profile.userId;
