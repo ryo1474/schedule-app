@@ -3,139 +3,308 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>予定入力</title>
+  <title>社内予定表</title>
   <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
-    .date { font-size: 13px; color: #888; margin-bottom: 20px; }
-    .section { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-    .section-title { font-size: 13px; color: #888; margin-bottom: 10px; }
-    .btns { display: flex; gap: 10px; }
-    .btn { flex: 1; padding: 16px 0; border-radius: 10px; border: 2px solid #ddd;
-      font-size: 22px; font-weight: bold; background: white; cursor: pointer; }
-    .btn.selected-maru { border-color: #1D9E75; background: #E1F5EE; color: #1D9E75; }
-    .btn.selected-sankaku { border-color: #BA7517; background: #FAEEDA; color: #BA7517; }
-    .btn.selected-batu { border-color: #A32D2D; background: #FCEBEB; color: #A32D2D; }
-    .submit { width: 100%; padding: 16px; background: #06C755; color: white;
-      border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 8px; }
-    .name-box { font-size: 15px; font-weight: bold; margin-bottom: 4px; }
-    .msg { text-align: center; font-size: 14px; color: #888; margin-top: 20px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; padding: 12px; }
+    h1 { font-size: 15px; font-weight: bold; margin-bottom: 8px; }
+    .week-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .week-nav button { padding: 6px 10px; font-size: 13px; border-radius: 8px; border: 1px solid #ddd; background: white; cursor: pointer; }
+    .week-label { font-size: 12px; color: #888; flex: 1; text-align: center; }
+    .legend { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 3px; font-size: 11px; color: #888; }
+    .dept-title { font-size: 12px; font-weight: bold; color: #555; padding: 4px 8px; border-left: 3px solid #06C755; margin-bottom: 6px; margin-top: 12px; }
+    .table-wrap { overflow-x: auto; margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 380px; }
+    th { background: #f0f0f0; padding: 4px 2px; border: 1px solid #ddd; text-align: center; font-weight: 500; white-space: nowrap; }
+    th.name-col { text-align: left; padding-left: 6px; width: 72px; }
+    th.today-col { background: #E8F5E9; }
+    td { border: 1px solid #ddd; padding: 1px; text-align: center; vertical-align: middle; }
+    td.name-cell { text-align: left; padding: 4px 6px; font-weight: 500; background: #fafafa; white-space: nowrap; font-size: 12px; }
+    td.name-cell.me { background: #E8F5E9; }
+    td.today-cell { background: #F1F8E9; }
+    .half-wrap { display: flex; flex-direction: column; gap: 1px; padding: 1px; }
+    .half-row { display: flex; align-items: center; justify-content: center; gap: 2px; }
+    .half-label { font-size: 8px; color: #bbb; width: 14px; }
+    .status-btn { width: 28px; height: 20px; border-radius: 4px; border: none; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .status-btn.tappable:active { transform: scale(0.92); }
+    .maru { color: #1D9E75; background: #E1F5EE; }
+    .sankaku { color: #BA7517; background: #FAEEDA; }
+    .batu { color: #A32D2D; background: #FCEBEB; }
+    .none { color: #ccc; background: #f5f5f5; }
+    .tappable.none { background: #ececec; cursor: pointer; }
+
+    .popup { display: none; position: fixed; z-index: 50; background: white; border: 1px solid #ddd; border-radius: 14px; padding: 10px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+    .popup.open { display: flex; flex-direction: column; gap: 6px; }
+    .popup-title { font-size: 11px; color: #888; text-align: center; margin-bottom: 2px; }
+    .popup-row { display: flex; gap: 8px; }
+    .pop-btn { width: 52px; height: 44px; border-radius: 10px; border: 1.5px solid #ddd; font-size: 20px; font-weight: bold; cursor: pointer; background: #f9f9f9; display: flex; align-items: center; justify-content: center; }
+    .pop-btn.p-maru { color: #1D9E75; border-color: #1D9E75; background: #E1F5EE; }
+    .pop-btn.p-sankaku { color: #BA7517; border-color: #BA7517; background: #FAEEDA; }
+    .pop-btn.p-batu { color: #A32D2D; border-color: #A32D2D; background: #FCEBEB; }
+    .pop-btn.p-none { color: #bbb; }
+
+    .overlay { display: none; position: fixed; inset: 0; z-index: 40; }
+    .overlay.open { display: block; }
+
+    .loading { text-align: center; color: #888; padding: 40px; font-size: 14px; }
+    .reg-section { background: white; border-radius: 12px; padding: 20px; margin-top: 20px; }
+    .reg-section h2 { font-size: 14px; margin-bottom: 12px; }
+    .reg-input { width: 100%; padding: 10px; font-size: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; }
+    .submit-btn { width: 100%; padding: 14px; background: #06C755; color: white; border: none; border-radius: 12px; font-size: 15px; font-weight: bold; cursor: pointer; margin-top: 8px; }
+    .msg { text-align: center; font-size: 13px; color: #888; margin-top: 12px; }
   </style>
 </head>
 <body>
-  <div id="app">読み込み中...</div>
 
-  <script>
-    const LIFF_ID = '2009834318-zb00ZUeL';
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwZfn0VThcxwCba7hefz25X-vQdF96hkpRJVcxYqGOXbEpyTiI0-7vkvy1sB1oztdM_/exec';
+<div id="app"><div class="loading">読み込み中...</div></div>
 
-    let lineId = '';
-    let selected = { am: '', pm: '' };
+<div class="overlay" id="overlay" onclick="closePopup()"></div>
+<div class="popup" id="popup">
+  <div class="popup-title" id="popup-title"></div>
+  <div class="popup-row">
+    <button class="pop-btn p-maru" onclick="selectStatus('maru')">○</button>
+    <button class="pop-btn p-sankaku" onclick="selectStatus('sankaku')">△</button>
+    <button class="pop-btn p-batu" onclick="selectStatus('batu')">×</button>
+    <button class="pop-btn p-none" onclick="selectStatus('')">—</button>
+  </div>
+</div>
 
-    async function init() {
-      try {
-        await liff.init({ liffId: LIFF_ID });
-      } catch(e) {
-        document.getElementById('app').innerHTML = 'LIFF初期化エラー: ' + e.message;
-        return;
-      }
+<script>
+  const LIFF_ID = '2009834318-zb00ZUeL';
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbwZfn0VThcxwCba7hefz25X-vQdF96hkpRJVcxYqGOXbEpyTiI0-7vkvy1sB1oztdM_/exec';
+  const DAY_JA = ['日','月','火','水','木','金','土'];
 
-      if (!liff.isLoggedIn()) { liff.login(); return; }
+  let myLineId = '';
+  let myMember = null;
+  let allMembers = [];
+  let allSchedule = [];
+  let weekOffset = 0;
+  let pendingKey = null;
 
-      let profile;
-      try {
-        profile = await liff.getProfile();
-      } catch(e) {
-        document.getElementById('app').innerHTML = 'プロフィール取得エラー: ' + e.message;
-        return;
-      }
-      lineId = profile.userId;
+  function getMondayOf(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+    d.setHours(0,0,0,0);
+    return d;
+  }
 
-      let member;
-      try {
-        const res = await fetch(`${GAS_URL}?action=getMember&line_id=${lineId}`);
-        member = await res.json();
-      } catch(e) {
-        document.getElementById('app').innerHTML = 'API接続エラー: ' + e.message;
-        return;
-      }
+  function getWeekDates() {
+    const mon = getMondayOf(new Date());
+    mon.setDate(mon.getDate() + weekOffset * 7);
+    return Array.from({length:7}, (_,i) => {
+      const d = new Date(mon);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+  }
 
-      if (!member.name) {
-        document.getElementById('app').innerHTML = `
-          <div class="section">
-            <div class="section-title">初回登録</div>
-            <input id="reg-name" type="text" placeholder="氏名を入力" style="width:100%;padding:10px;font-size:15px;border-radius:8px;border:1px solid #ddd;margin-bottom:10px;box-sizing:border-box;">
-            <select id="reg-dept" style="width:100%;padding:10px;font-size:15px;border-radius:8px;border:1px solid #ddd;box-sizing:border-box;">
-              <option value="事務">事務</option>
-              <option value="現場監督">現場監督</option>
-            </select>
-            <button class="submit" style="margin-top:16px;" onclick="register()">登録する</button>
-            <p class="msg" id="reg-msg"></p>
-          </div>
-        `;
-        return;
-      }
+  function dateKey(d) {
+    return d.toISOString().slice(0,10);
+  }
 
-      showSchedule(member);
+  function isToday(d) {
+    return dateKey(d) === dateKey(new Date());
+  }
+
+  function getStatus(lineId, date, slot) {
+    const dk = dateKey(date);
+    const row = allSchedule.find(s => s.line_id === lineId && s.date === dk);
+    if (!row) return '';
+    return slot === 'am' ? (row.am || '') : (row.pm || '');
+  }
+
+  function statusClass(st) {
+    if (st === 'maru') return 'maru';
+    if (st === 'sankaku') return 'sankaku';
+    if (st === 'batu') return 'batu';
+    return 'none';
+  }
+
+  function statusLabel(st) {
+    if (st === 'maru') return '○';
+    if (st === 'sankaku') return '△';
+    if (st === 'batu') return '×';
+    return '—';
+  }
+
+  function render() {
+    const dates = getWeekDates();
+    const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
+
+    let html = `
+      <h1>社内予定表</h1>
+      <div class="week-nav">
+        <button onclick="changeWeek(-1)">←</button>
+        <span class="week-label">${fmt(dates[0])}（月）〜 ${fmt(dates[6])}（日）</span>
+        <button onclick="changeWeek(1)">→</button>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span style="color:#1D9E75;font-weight:bold;">○</span>出勤・連絡可</div>
+        <div class="legend-item"><span style="color:#BA7517;font-weight:bold;">△</span>休み・連絡可</div>
+        <div class="legend-item"><span style="color:#A32D2D;font-weight:bold;">×</span>不在・連絡不可</div>
+      </div>
+    `;
+
+    const depts = ['事務', '現場監督'];
+    depts.forEach(dept => {
+      const members = allMembers.filter(m => m.dept === dept);
+      if (!members.length) return;
+
+      html += `<div class="dept-title">${dept}</div><div class="table-wrap"><table>`;
+      html += '<tr><th class="name-col">氏名</th>';
+      dates.forEach(d => {
+        html += `<th class="${isToday(d) ? 'today-col' : ''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:9px;">${DAY_JA[d.getDay()]}</span></th>`;
+      });
+      html += '</tr>';
+
+      members.forEach(m => {
+        const isMe = m.line_id === myLineId;
+        html += `<tr><td class="name-cell${isMe ? ' me' : ''}">${m.name}${isMe ? '<br><span style="font-size:9px;color:#06C755;">自分</span>' : ''}</td>`;
+        dates.forEach(d => {
+          const dk = dateKey(d);
+          const am = getStatus(m.line_id, d, 'am');
+          const pm = getStatus(m.line_id, d, 'pm');
+          const todayCls = isToday(d) ? 'today-cell' : '';
+          html += `<td class="${todayCls}"><div class="half-wrap">`;
+          ['am','pm'].forEach(slot => {
+            const st = slot === 'am' ? am : pm;
+            const key = `${m.line_id}_${dk}_${slot}`;
+            const label = slot === 'am' ? '午前' : '午後';
+            if (isMe) {
+              html += `<div class="half-row"><span class="half-label">${label}</span><button class="status-btn ${statusClass(st)} tappable" onclick="openPopup('${key}','${label}',this)">${statusLabel(st)}</button></div>`;
+            } else {
+              html += `<div class="half-row"><span class="half-label">${label}</span><div class="status-btn ${statusClass(st)}">${statusLabel(st)}</div></div>`;
+            }
+          });
+          html += `</div></td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</table></div>';
+    });
+
+    document.getElementById('app').innerHTML = html;
+  }
+
+  function openPopup(key, label, btn) {
+    pendingKey = key;
+    document.getElementById('popup-title').textContent = label;
+    const rect = btn.getBoundingClientRect();
+    const popup = document.getElementById('popup');
+    popup.classList.add('open');
+    document.getElementById('overlay').classList.add('open');
+    let top = rect.bottom + 6;
+    let left = rect.left - 60;
+    if (left < 8) left = 8;
+    if (left + 230 > window.innerWidth) left = window.innerWidth - 238;
+    if (top + 90 > window.innerHeight) top = rect.top - 96;
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+  }
+
+  function closePopup() {
+    document.getElementById('popup').classList.remove('open');
+    document.getElementById('overlay').classList.remove('open');
+    pendingKey = null;
+  }
+
+  async function selectStatus(val) {
+    if (!pendingKey) return;
+    const key = pendingKey;
+    closePopup();
+
+    const parts = key.split('_');
+    const date = parts[1];
+    const slot = parts[2];
+
+    // ローカルで即反映
+    let row = allSchedule.find(s => s.line_id === myLineId && s.date === date);
+    if (!row) {
+      row = { line_id: myLineId, date, am: '', pm: '' };
+      allSchedule.push(row);
+    }
+    if (slot === 'am') row.am = val;
+    else row.pm = val;
+    render();
+
+    // GASに保存
+    await fetch(`${GAS_URL}?action=setSchedule&line_id=${myLineId}&date=${date}&am=${row.am}&pm=${row.pm}`);
+  }
+
+  function changeWeek(dir) {
+    weekOffset += dir;
+    render();
+  }
+
+  async function loadData() {
+    const [membersRes, scheduleRes] = await Promise.all([
+      fetch(`${GAS_URL}?action=getMembers`),
+      fetch(`${GAS_URL}?action=getSchedule`)
+    ]);
+    allMembers = await membersRes.json();
+    allSchedule = await scheduleRes.json();
+    allSchedule = allSchedule.map(s => ({
+      ...s,
+      date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0,10)
+    }));
+  }
+
+  function showRegister() {
+    document.getElementById('app').innerHTML = `
+      <h1>社内予定表</h1>
+      <div class="reg-section">
+        <h2>初回登録</h2>
+        <input class="reg-input" id="reg-name" type="text" placeholder="氏名を入力">
+        <select class="reg-input" id="reg-dept">
+          <option value="事務">事務</option>
+          <option value="現場監督">現場監督</option>
+        </select>
+        <button class="submit-btn" onclick="register()">登録する</button>
+        <p class="msg" id="reg-msg"></p>
+      </div>
+    `;
+  }
+
+  async function register() {
+    const name = document.getElementById('reg-name').value.trim();
+    const dept = document.getElementById('reg-dept').value;
+    if (!name) { document.getElementById('reg-msg').textContent = '氏名を入力してください'; return; }
+    document.getElementById('reg-msg').textContent = '登録中...';
+    await fetch(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
+    allMembers.push({ line_id: myLineId, name, dept });
+    myMember = { name, dept };
+    render();
+  }
+
+  async function init() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+    } catch(e) {
+      document.getElementById('app').innerHTML = '<div class="loading">LIFF初期化エラー: ' + e.message + '</div>';
+      return;
     }
 
-    function showSchedule(member) {
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10);
-      const dateLabel = `${today.getMonth()+1}月${today.getDate()}日（${'日月火水木金土'[today.getDay()]}）`;
+    if (!liff.isLoggedIn()) { liff.login(); return; }
 
-      document.getElementById('app').innerHTML = `
-        <div class="name-box">${member.name}　<span style="font-size:12px;color:#888;">${member.dept}</span></div>
-        <div class="date">${dateLabel}の予定</div>
-        <div class="section">
-          <div class="section-title">午前</div>
-          <div class="btns">
-            <button class="btn" onclick="select('am','maru',this)">○</button>
-            <button class="btn" onclick="select('am','sankaku',this)">△</button>
-            <button class="btn" onclick="select('am','batu',this)">×</button>
-          </div>
-        </div>
-        <div class="section">
-          <div class="section-title">午後</div>
-          <div class="btns">
-            <button class="btn" onclick="select('pm','maru',this)">○</button>
-            <button class="btn" onclick="select('pm','sankaku',this)">△</button>
-            <button class="btn" onclick="select('pm','batu',this)">×</button>
-          </div>
-        </div>
-        <button class="submit" onclick="submitSchedule('${dateStr}')">送信する</button>
-        <p class="msg" id="result"></p>
-      `;
+    const profile = await liff.getProfile();
+    myLineId = profile.userId;
+
+    await loadData();
+
+    myMember = allMembers.find(m => m.line_id === myLineId) || null;
+
+    if (!myMember) {
+      showRegister();
+    } else {
+      render();
     }
+  }
 
-    function select(slot, val, el) {
-      selected[slot] = val;
-      el.parentElement.querySelectorAll('.btn').forEach(b => b.className = 'btn');
-      el.classList.add(`selected-${val}`);
-    }
-
-    async function register() {
-      const name = document.getElementById('reg-name').value.trim();
-      const dept = document.getElementById('reg-dept').value;
-      if (!name) {
-        document.getElementById('reg-msg').textContent = '氏名を入力してください';
-        return;
-      }
-      document.getElementById('reg-msg').textContent = '登録中...';
-      await fetch(`${GAS_URL}?action=registerMember&line_id=${lineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
-      location.reload();
-    }
-
-    async function submitSchedule(date) {
-      if (!selected.am || !selected.pm) {
-        document.getElementById('result').textContent = '午前・午後どちらも選んでください';
-        return;
-      }
-      await fetch(`${GAS_URL}?action=setSchedule&line_id=${lineId}&date=${date}&am=${selected.am}&pm=${selected.pm}`);
-      document.getElementById('result').textContent = '✓ 送信しました！';
-    }
-
-    init();
-  </script>
+  init();
+</script>
 </body>
 </html>
