@@ -241,12 +241,18 @@
   }
 
   async function loadData() {
-    const [membersRes, scheduleRes] = await Promise.all([
-      fetch(`${GAS_URL}?action=getMembers`),
-      fetch(`${GAS_URL}?action=getSchedule`)
-    ]);
+    const membersRes = await fetch(GAS_URL + '?action=getMembers', {
+      redirect: 'follow',
+      mode: 'cors'
+    });
     allMembers = await membersRes.json();
+    
+    const scheduleRes = await fetch(GAS_URL + '?action=getSchedule', {
+      redirect: 'follow', 
+      mode: 'cors'
+    });
     allSchedule = await scheduleRes.json();
+    
     allSchedule = allSchedule.map(s => ({
       ...s,
       date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0,10)
