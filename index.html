@@ -110,8 +110,16 @@
     });
   }
 
-  function dateKey(d) { return d.toISOString().slice(0,10); }
-  function isToday(d) { return dateKey(d) === dateKey(new Date()); }
+  function dateKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+  }
+
+  function isToday(d) {
+  return dateKey(d) === dateKey(new Date());
+  }
 
   function getStatus(lineId, date, slot) {
     const dk = dateKey(date);
