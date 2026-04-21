@@ -245,10 +245,17 @@
     try {
       allMembers = await jsonp(GAS_URL + '?action=getMembers');
       allSchedule = await jsonp(GAS_URL + '?action=getSchedule');
-      allSchedule = allSchedule.map(s => ({
-        ...s,
-        date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0,10)
-      }));
+      allSchedule = allSchedule.map(s => {
+        let date = s.date;
+        if (date && date.includes(' ')) {
+          const d = new Date(date);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          date = y + '-' + m + '-' + day;
+        }
+        return { ...s, date };
+      });
     } catch(e) {
       document.getElementById('app').innerHTML = '<div class="loading">データ読み込みエラー: ' + e.message + '</div>';
       throw e;
