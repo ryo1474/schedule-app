@@ -267,17 +267,22 @@
     const name = document.getElementById('reg-name').value.trim();
     const dept = document.getElementById('reg-dept').value;
     if (!name) { document.getElementById('reg-msg').textContent = '氏名を入力してください'; return; }
-    document.getElementById('reg-msg').textContent = '登録中...';
+    document.getElementById('reg-msg').textContent = '登録中...（しばらくお待ちください）';
     try {
       await jsonp(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
-      document.getElementById('reg-msg').textContent = '登録完了！読み込み中...';
-      await loadData();
-      myMember = allMembers.find(m => m.line_id === myLineId) || null;
-      render();
     } catch(e) {
-      document.getElementById('reg-msg').textContent = 'エラー: ' + e.message;
+      // タイムアウトでも処理は完了しているので続行
+    }
+    document.getElementById('reg-msg').textContent = '登録完了！読み込み中...';
+    await loadData();
+    myMember = allMembers.find(m => m.line_id === myLineId) || null;
+    if (myMember) {
+      render();
+    } else {
+      document.getElementById('reg-msg').textContent = '登録に失敗しました。もう一度お試しください。';
     }
   }
+
 
   async function init() {
     try {
