@@ -34,8 +34,7 @@
     .batu { color: #A32D2D; background: #FCEBEB; }
     .none { color: #ccc; background: #f5f5f5; }
     .tappable.none { background: #ececec; cursor: pointer; }
-
-    .popup { display: none; position: fixed; z-index: 50; background: white; border: 1px solid #ddd; border-radius: 14px; padding: 10px 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+    .popup { display: none; position: fixed; z-index: 50; background: white; border: 1px solid #ddd; border-radius: 14px; padding: 10px 12px; }
     .popup.open { display: flex; flex-direction: column; gap: 6px; }
     .popup-title { font-size: 11px; color: #888; text-align: center; margin-bottom: 2px; }
     .popup-row { display: flex; gap: 8px; }
@@ -44,10 +43,8 @@
     .pop-btn.p-sankaku { color: #BA7517; border-color: #BA7517; background: #FAEEDA; }
     .pop-btn.p-batu { color: #A32D2D; border-color: #A32D2D; background: #FCEBEB; }
     .pop-btn.p-none { color: #bbb; }
-
     .overlay { display: none; position: fixed; inset: 0; z-index: 40; }
     .overlay.open { display: block; }
-
     .loading { text-align: center; color: #888; padding: 40px; font-size: 14px; }
     .reg-section { background: white; border-radius: 12px; padding: 20px; margin-top: 20px; }
     .reg-section h2 { font-size: 14px; margin-bottom: 12px; }
@@ -59,7 +56,6 @@
 <body>
 
 <div id="app"><div class="loading">読み込み中...</div></div>
-
 <div class="overlay" id="overlay" onclick="closePopup()"></div>
 <div class="popup" id="popup">
   <div class="popup-title" id="popup-title"></div>
@@ -83,6 +79,19 @@
   let weekOffset = 0;
   let pendingKey = null;
 
+  // JSONP：CORSを回避してGASにリクエストする
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const cb = 'cb_' + Math.random().toString(36).slice(2);
+      window[cb] = (data) => { delete window[cb]; resolve(data); };
+      const s = document.createElement('script');
+      s.src = url + '&callback=' + cb;
+      s.onerror = () => reject(new Error('通信エラー'));
+      document.head.appendChild(s);
+      setTimeout(() => reject(new Error('タイムアウト')), 10000);
+    });
+  }
+
   function getMondayOf(date) {
     const d = new Date(date);
     const day = d.getDay();
@@ -101,13 +110,8 @@
     });
   }
 
-  function dateKey(d) {
-    return d.toISOString().slice(0,10);
-  }
-
-  function isToday(d) {
-    return dateKey(d) === dateKey(new Date());
-  }
+  function dateKey(d) { return d.toISOString().slice(0,10); }
+  function isToday(d) { return dateKey(d) === dateKey(new Date()); }
 
   function getStatus(lineId, date, slot) {
     const dk = dateKey(date);
@@ -133,7 +137,6 @@
   function render() {
     const dates = getWeekDates();
     const fmt = d => `${d.getMonth()+1}/${d.getDate()}`;
-
     let html = `
       <h1>社内予定表</h1>
       <div class="week-nav">
@@ -148,18 +151,15 @@
       </div>
     `;
 
-    const depts = ['事務', '現場監督'];
-    depts.forEach(dept => {
+    ['事務','現場監督'].forEach(dept => {
       const members = allMembers.filter(m => m.dept === dept);
       if (!members.length) return;
-
       html += `<div class="dept-title">${dept}</div><div class="table-wrap"><table>`;
       html += '<tr><th class="name-col">氏名</th>';
       dates.forEach(d => {
         html += `<th class="${isToday(d) ? 'today-col' : ''}">${d.getMonth()+1}/${d.getDate()}<br><span style="font-size:9px;">${DAY_JA[d.getDay()]}</span></th>`;
       });
       html += '</tr>';
-
       members.forEach(m => {
         const isMe = m.line_id === myLineId;
         html += `<tr><td class="name-cell${isMe ? ' me' : ''}">${m.name}${isMe ? '<br><span style="font-size:9px;color:#06C755;">自分</span>' : ''}</td>`;
@@ -167,23 +167,21 @@
           const dk = dateKey(d);
           const am = getStatus(m.line_id, d, 'am');
           const pm = getStatus(m.line_id, d, 'pm');
-          const todayCls = isToday(d) ? 'today-cell' : '';
-          html += `<td class="${todayCls}"><div class="half-wrap">`;
+          html += `<td class="${isToday(d) ? 'today-cell' : ''}"><div class="half-wrap">`;
           ['am','pm'].forEach(slot => {
             const st = slot === 'am' ? am : pm;
             const key = `${m.line_id}_${dk}_${slot}`;
-            const label = slot === 'am' ? '午前' : '午後';
+            const lbl = slot === 'am' ? '午前' : '午後';
             if (isMe) {
-              html += `<div class="half-row"><span class="half-label">${label}</span><button class="status-btn ${statusClass(st)} tappable" onclick="openPopup('${key}','${label}',this)">${statusLabel(st)}</button></div>`;
+              html += `<div class="half-row"><span class="half-label">${lbl}</span><button class="status-btn ${statusClass(st)} tappable" onclick="openPopup('${key}','${lbl}',this)">${statusLabel(st)}</button></div>`;
             } else {
-              html += `<div class="half-row"><span class="half-label">${label}</span><div class="status-btn ${statusClass(st)}">${statusLabel(st)}</div></div>`;
+              html += `<div class="half-row"><span class="half-label">${lbl}</span><div class="status-btn ${statusClass(st)}">${statusLabel(st)}</div></div>`;
             }
           });
           html += `</div></td>`;
         });
         html += '</tr>';
       });
-
       html += '</table></div>';
     });
 
@@ -216,12 +214,9 @@
     if (!pendingKey) return;
     const key = pendingKey;
     closePopup();
-
     const parts = key.split('_');
     const date = parts[1];
     const slot = parts[2];
-
-    // ローカルで即反映
     let row = allSchedule.find(s => s.line_id === myLineId && s.date === date);
     if (!row) {
       row = { line_id: myLineId, date, am: '', pm: '' };
@@ -230,9 +225,7 @@
     if (slot === 'am') row.am = val;
     else row.pm = val;
     render();
-
-    // GASに保存
-    await fetch(`${GAS_URL}?action=setSchedule&line_id=${myLineId}&date=${date}&am=${row.am}&pm=${row.pm}`);
+    await jsonp(`${GAS_URL}?action=setSchedule&line_id=${myLineId}&date=${date}&am=${row.am}&pm=${row.pm}`);
   }
 
   function changeWeek(dir) {
@@ -241,22 +234,17 @@
   }
 
   async function loadData() {
-    const membersRes = await fetch(GAS_URL + '?action=getMembers', {
-      redirect: 'follow',
-      mode: 'cors'
-    });
-    allMembers = await membersRes.json();
-    
-    const scheduleRes = await fetch(GAS_URL + '?action=getSchedule', {
-      redirect: 'follow', 
-      mode: 'cors'
-    });
-    allSchedule = await scheduleRes.json();
-    
-    allSchedule = allSchedule.map(s => ({
-      ...s,
-      date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0,10)
-    }));
+    try {
+      allMembers = await jsonp(GAS_URL + '?action=getMembers');
+      allSchedule = await jsonp(GAS_URL + '?action=getSchedule');
+      allSchedule = allSchedule.map(s => ({
+        ...s,
+        date: typeof s.date === 'string' ? s.date : new Date(s.date).toISOString().slice(0,10)
+      }));
+    } catch(e) {
+      document.getElementById('app').innerHTML = '<div class="loading">データ読み込みエラー: ' + e.message + '</div>';
+      throw e;
+    }
   }
 
   function showRegister() {
@@ -280,7 +268,7 @@
     const dept = document.getElementById('reg-dept').value;
     if (!name) { document.getElementById('reg-msg').textContent = '氏名を入力してください'; return; }
     document.getElementById('reg-msg').textContent = '登録中...';
-    await fetch(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
+    await jsonp(`${GAS_URL}?action=registerMember&line_id=${myLineId}&name=${encodeURIComponent(name)}&dept=${encodeURIComponent(dept)}`);
     allMembers.push({ line_id: myLineId, name, dept });
     myMember = { name, dept };
     render();
@@ -293,21 +281,14 @@
       document.getElementById('app').innerHTML = '<div class="loading">LIFF初期化エラー: ' + e.message + '</div>';
       return;
     }
-
-    if (!liff.isLoggedIn()) { 
-      liff.login({ 
-      redirectUri: 'https://ryo1474.github.io/schedule-app/' 
-      }); 
-    return; 
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: 'https://ryo1474.github.io/schedule-app/' });
+      return;
     }
-
     const profile = await liff.getProfile();
     myLineId = profile.userId;
-
     await loadData();
-
     myMember = allMembers.find(m => m.line_id === myLineId) || null;
-
     if (!myMember) {
       showRegister();
     } else {
